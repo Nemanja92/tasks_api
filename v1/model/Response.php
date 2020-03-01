@@ -9,6 +9,42 @@
     private $_toCache = false;
     private $_responseData = array();
 
+    public function __construct() {
+    // allocate your stuff
+    }
+
+    // custom initialization, since we want to keep both, original __construct and this one
+    // we need __construct in case we want to initialize Response without params
+    public function init($success, $httpStatusCode, $messages, $data, $toCache) {
+      $instance = new self();
+      $instance->_success = $success;
+      $instance->_httpStatusCode = $httpStatusCode;
+      $instance->_messages[] = $messages;
+      $instance->_data = $data;
+      $instance->_toCache = $toCache;
+      return $instance;
+    }
+
+    public function initSuccess($httpStatusCode, $messages, $data, $toCache) {
+      $instance = new self();
+      $instance->_success = true;
+      $instance->_httpStatusCode = $httpStatusCode;
+      $instance->_messages[] = $messages;
+      $instance->_data = $data;
+      $instance->_toCache = $toCache;
+      return $instance;
+    }
+
+    public function initFailure($httpStatusCode, $messages) {
+      $instance = new self();
+      $instance->_success = false;
+      $instance->_httpStatusCode = $httpStatusCode;
+      $instance->_messages[] = $messages;
+      $instance->_data = null;
+      $instance->_toCache = false;
+      return $instance;
+    }
+
     public function setSuccess($success) {
       $this->_success = $success;
     }
