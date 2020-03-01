@@ -11,6 +11,7 @@ class DB {
       self::$writeDBConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
       self::$writeDBConnection->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     }
+
     return self::$writeDBConnection;
   }
 
