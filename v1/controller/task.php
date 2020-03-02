@@ -146,6 +146,47 @@ if(array_key_exists("taskid",$_GET)) {
     exit();
   }
 
+} else if (empty($_GET)) {
+
+  if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+      try {
+        $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks');
+        $query->execute();
+        $rowCount = $query->rowCount();
+        $taskArray = array();
+        while($row = $query->fetch(PDO::FETCH_ASSOC)) {
+          $task = new Task($row['id'], $row['title'], $row['description'], $row['deadline'], $row['completed']);
+          $taskArray[] = $task->returnTaskArray();
+        }
+        $returnData = array();
+        $returnData['rows_returned'] = $rowCount;
+        $returnData['tasks'] = $taskArray;
+        $response = Response::initSuccess(200,"Data fetched successfully",$returnData,true);
+        $response->send();
+        exit();
+      } catch (TaskException $ex) {
+        $response = Response::initFailure(500,$ex->getMessage());
+        $response->send();
+        exit();
+      } catch (PDOException $ex) {
+        error_log("Database query error - ".$ex, 0);
+        $response = Response::initFailure(500,"Failed to get task");
+        $response->send();
+        exit();
+      }
+  } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+  } else {
+    $response = Response::initFailure(405,"Request method not allowed");
+    $response->send();
+    exit();
+  }
+
+
+} else {
+  $response = Response::initFailure(404,"Endpoint not found");
+  $response->send();
+  exit();
 }
 
 
