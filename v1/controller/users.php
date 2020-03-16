@@ -72,7 +72,7 @@ try {
     $rowCount = $query->rowCount();
 
     if ($rowCount !== 0) {
-        $response = Response::initFailure(409,"Username already exist");
+        $response = Response::initFailure(401,"Username already exist");
         $response->send();
         exit();
     }
