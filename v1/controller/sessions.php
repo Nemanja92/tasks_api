@@ -14,6 +14,65 @@ try {
 
 if(array_key_exists("sessionid",$_GET)) {
 
+    $sessionid = $_GET['sessionid'];
+
+    if ($sessionid == '' || !is_numeric($sessionid)) {
+        $response = Response::initFailure(400,null);
+        ($sessionid === '' ? $response->addMessage("Session ID cannot be blank") : false);
+        (!is_numeric($sessionid) ? $response->addMessage("Session ID must be numeric") : false);
+        $response->send();
+        exit();
+    }
+
+    if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
+        $response = Response::initFailure(401,null);
+        (!isset($_SERVER['HTTP_AUTHORIZATION']) ? $response->addMessage("Access token is missing from the header") : false);
+        (strlen($_SERVER['HTTP_AUTHORIZATION']) < 1 ? $response->addMessage("Access token cannot be blank") : false);
+        $response->send();
+        exit();
+    }
+
+    $accesstoken = $_SERVER['HTTP_AUTHORIZATION'];
+
+    if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+
+        try {
+            $query = $writeDB->prepare('delete from tblsessions where id = :sessionid and accesstoken = :accesstoken');
+            $query->bindParam(':sessionid', $sessionid, PDO::PARAM_INT);
+            $query->bindParam(':accesstoken', $accesstoken, PDO::PARAM_STR);
+            $query->execute();
+
+            $rowCount = $query->rowCount();
+
+            echo($rowCount);
+
+            if ($rowCount === 0) {
+                $response = Response::initFailure(400,"Failed to logout of this session using access token provided");
+                $response->send();
+                exit();
+            }
+
+            $returnData = array();
+            $returnData['session_id'] = intval($sessionid);
+
+            $response = Response::initSuccess(200,"User logged out successfully",$returnData,false);
+            $response->send();
+            exit();
+
+        } catch(PDOException $ex) {
+            $response = Response::initFailure(500,"There was an issue logging out - please try again");
+            $response->send();
+            exit();
+        }
+
+
+    } else if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+
+    } else {
+        $response = Response::initFailure(405,'Request method not allowed');
+        $response->send();
+        exit();
+    }
 
 } else if (empty($_GET)) {
 
