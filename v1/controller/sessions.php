@@ -137,7 +137,7 @@ if(array_key_exists("sessionid",$_GET)) {
                 $response->send();
                 exit();
             }
-
+            date_default_timezone_set('GMT');
             if (strtotime($returned_refreshtokenexpiry) < time()) {
                 $response = Response::initFailure(401,"Refresh token has expired - please log in again");
                 $response->send();
@@ -314,7 +314,7 @@ if(array_key_exists("sessionid",$_GET)) {
         $query->bindParam(':id', $returned_id, PDO::PARAM_INT);
         $query->execute();
 
-        $query = $writeDB->prepare('insert into tblsessions (userid, accesstoken, accesstokenexpiry, refreshtoken, refreshtokenexpiry) values (:userid, :accesstoken, date_add(NOW(), INTERVAL :accesstokenexpiryseconds SECOND), :refreshtoken, date_add(NOW(), INTERVAL :refreshtokenexpiryseconds SECOND))');
+        $query = $writeDB->prepare('insert into tblsessions (userid, accesstoken, accesstokenexpiry, refreshtoken, refreshtokenexpiry) values (:userid, :accesstoken, date_add(CURRENT_TIMESTAMP, INTERVAL :accesstokenexpiryseconds SECOND), :refreshtoken, date_add(NOW(), INTERVAL :refreshtokenexpiryseconds SECOND))');
         $query->bindParam(':userid', $returned_id, PDO::PARAM_INT);
         $query->bindParam(':accesstoken', $accesstoken, PDO::PARAM_STR);
         $query->bindParam(':accesstokenexpiryseconds', $access_token_expiry_seconds, PDO::PARAM_INT);

@@ -16,6 +16,70 @@ try {
   exit();
 }
 
+// begin auth script
+
+if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
+  $response = Response::initFailure(401,null);
+  (!isset($_SERVER['HTTP_AUTHORIZATION']) ? $response->addMessage("Access token is missing from the header") : false);
+  (strlen($_SERVER['HTTP_AUTHORIZATION']) < 1 ? $response->addMessage("Access token cannot be blank") : false);
+  $response->send();
+  exit();
+}
+
+$accesstoken = $_SERVER['HTTP_AUTHORIZATION'];
+
+try {
+  $query = $writeDB->prepare('select userid, accesstokenexpiry, useractive, loginattempts from tblsessions, tblusers where tblsessions.userid = tblusers.id and accesstoken = :accesstoken');
+  $query->bindParam(':accesstoken', $accesstoken, PDO::PARAM_STR);
+  $query->execute();
+
+  $rowCount = $query->rowCount();
+
+  if ($rowCount === 0) {
+    $response = Response::initFailure(401, "Invalid access token");
+    $response->send();
+    exit();
+  }
+
+  $row = $query->fetch(PDO::FETCH_ASSOC);
+
+  $returned_userid = $row['userid'];
+  $returned_accesstokenexpiry = $row['accesstokenexpiry'];
+  $returned_useractive = $row['useractive'];
+  $returned_loginattempts = $row['loginattempts'];
+
+  if ($returned_useractive !== 'Y') {
+    $response = Response::initFailure(401, "User account is not active");
+    $response->send();
+    exit();
+  }
+
+  if ($returned_loginattempts >= 3) {
+    $response = Response::initFailure(401, "User account is currently locked out");
+    $response->send();
+    exit();
+  }
+
+//  echo(date_default_timezone_get());
+//  echo $returned_accesstokenexpiry, ' ', date('Y-m-d H:i:s', time()), PHP_EOL;
+
+  date_default_timezone_set('GMT');
+
+  if (strtotime($returned_accesstokenexpiry) < time()) {
+    $response = Response::initFailure(401, "Access token expired");
+    $response->send();
+    exit();
+  }
+} catch (PDOException $ex) {
+  $response = Response::initFailure(500, "There was an issue authenticating - please try again");
+  $response->send();
+  exit();
+}
+
+
+// end auth script
+
+
 if(array_key_exists("taskid",$_GET)) {
 
   $taskid = $_GET['taskid'];
@@ -28,8 +92,9 @@ if(array_key_exists("taskid",$_GET)) {
   if($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     try {
-      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid');
+      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid and userid = :userid');
       $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -65,8 +130,9 @@ if(array_key_exists("taskid",$_GET)) {
   } else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     try {
 
-      $query = $writeDB->prepare('delete from tbltasks where id = :taskid');
+      $query = $writeDB->prepare('delete from tbltasks where id = :taskid and userid = :userid');
       $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -137,8 +203,9 @@ if(array_key_exists("taskid",$_GET)) {
       exit;
     }
 
-      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid');
+      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid and userid = :userid');
       $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -153,7 +220,7 @@ if(array_key_exists("taskid",$_GET)) {
         $task = new Task($row['id'], $row['title'], $row['description'], $row['deadline'], $row['completed']);
       }
 
-      $queryString = "update tbltasks set ".$queryFields." where id = :taskid";
+      $queryString = "update tbltasks set ".$queryFields." where id = :taskid and userid = :userid";
       $query = $writeDB->prepare($queryString);
 
       if ($title_updated === true) {
@@ -183,6 +250,7 @@ if(array_key_exists("taskid",$_GET)) {
 
 
       $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -193,8 +261,9 @@ if(array_key_exists("taskid",$_GET)) {
         exit();
       }
 
-      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid');
+      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid and userid = :userid');
       $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -254,8 +323,9 @@ if(array_key_exists("taskid",$_GET)) {
 
     try {
 
-      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where completed = :completed');
+      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where completed = :completed and userid = :userid');
       $query->bindParam(':completed', $completed, PDO::PARAM_STR);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
 
       $rowCount = $query->rowCount();
@@ -308,7 +378,8 @@ if(array_key_exists("taskid",$_GET)) {
 
     try {
 
-      $query = $readDB->prepare('select count(id) as totalNoOfTasks from tbltasks');
+      $query = $readDB->prepare('select count(id) as totalNoOfTasks from tbltasks and userid = :userid');
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
       $row = $query->fetch(PDO::FETCH_ASSOC);
       $tasksCount = intval($row['totalNoOfTasks']);
@@ -326,7 +397,8 @@ if(array_key_exists("taskid",$_GET)) {
       }
 
       $offset = ($page == 1 ? 0 : ($limitPerPage*($page-1)));
-      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks limit :pglimit offset :offset');
+      $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where userid = :userid limit :pglimit offset :offset');
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->bindParam(':pglimit',$limitPerPage, PDO::PARAM_INT);
       $query->bindParam(':offset',$offset, PDO::PARAM_INT);
       $query->execute();
@@ -372,7 +444,8 @@ if(array_key_exists("taskid",$_GET)) {
 
   if ($_SERVER['REQUEST_METHOD'] === 'GET') {
       try {
-        $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks');
+        $query = $readDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where userid = :userid');
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
         $query->execute();
         $rowCount = $query->rowCount();
         $taskArray = array();
@@ -435,11 +508,12 @@ if(array_key_exists("taskid",$_GET)) {
       $deadline = $newTask->getDeadline();
       $completed = $newTask->getCompleted();
       
-      $query = $writeDB->prepare('insert into tbltasks (title, description, deadline, completed) values (:title, :description, STR_TO_DATE(:deadline, "%d/%m/%Y %H:%i"), :completed)');
+      $query = $writeDB->prepare('insert into tbltasks (title, description, deadline, completed, userid) values (:title, :description, STR_TO_DATE(:deadline, "%d/%m/%Y %H:%i"), :completed, :userid)');
       $query->bindParam(':title', $title, PDO::PARAM_STR);
       $query->bindParam(':description', $description, PDO::PARAM_STR);
       $query->bindParam(':deadline', $deadline, PDO::PARAM_STR);
       $query->bindParam(':completed', $completed, PDO::PARAM_STR);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
       $rowCount = $query->rowCount();
 
@@ -450,8 +524,9 @@ if(array_key_exists("taskid",$_GET)) {
       }
 
       $lastTaskID = $writeDB->lastInsertId();
-      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid');
+      $query = $writeDB->prepare('select id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") as deadline, completed from tbltasks where id = :taskid and userid = :userid');
       $query->bindParam(':taskid', $lastTaskID, PDO::PARAM_INT);
+      $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
       $query->execute();
       $rowCount = $query->rowCount();
 
